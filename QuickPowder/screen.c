@@ -136,6 +136,56 @@ static void screen_initialize_output_buffer(void)
 	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleScreenBufferInfoEx(output, &csbi));
 }
 
+static void screen_handle_mouse(mouse_t* mouse, MOUSE_EVENT_RECORD mer)
+{
+	/* to do: incorporate dwButtonState check */
+	if (mer.dwEventFlags == 0)
+	{
+		mouse->mouse1 = !mouse->mouse1;
+	}
+	mouse->x = mer.dwMousePosition.X;
+	mouse->y = mer.dwMousePosition.Y;
+}
+
+static void screen_update_mouse(mouse_t* mouse)
+{
+	if (mouse->mouse1)
+	{
+		int dx = abs(mouse->x - mouse->px),
+			sx = mouse->px < mouse->x ? 1 : -1;
+		int dy = -abs(mouse->y - mouse->py),
+			sy = mouse->py < mouse->y ? 1 : -1;
+		int error = dx + dy;
+
+		int x = mouse->px, y = mouse->py;
+		while (true)
+		{
+			powder_mouse_down(x, y);
+			int error2 = error * 2;
+			if (error2 >= dy)
+			{
+				if (x == mouse->x)
+				{
+					break;
+				}
+				error += dy;
+				x += sx;
+			}
+			if (error2 <= dx)
+			{
+				if (y == mouse->y)
+				{
+					break;
+				}
+				error += dx;
+				y += sy;
+			}
+		}
+	}
+	mouse->px = mouse->x;
+	mouse->py = mouse->y;
+}
+
 int main()
 {
 	output = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
@@ -200,16 +250,8 @@ int main()
 			}
 			case MOUSE_EVENT:
 			{
-				MOUSE_EVENT_RECORD mer = record.Event.MouseEvent;
-				/* to do: incorporate dwButtonState check */
-				if (mer.dwEventFlags == 0)
-				{
-					mouse.mouse1 = !mouse.mouse1;
-				}
-				mouse.px = mouse.x;
-				mouse.py = mouse.y;
-				mouse.x = mer.dwMousePosition.X;
-				mouse.y = mer.dwMousePosition.Y;
+				screen_handle_mouse(&mouse, record.Event.MouseEvent);
+				break;
 			}
 			case WINDOW_BUFFER_SIZE_EVENT:
 			{
@@ -231,10 +273,7 @@ int main()
 		double update_delta = (double)tick_elapsed.QuadPart / frequency.QuadPart;
 		if (update_delta > POWDER_TICK_RATE)
 		{
-			if (mouse.mouse1)
-			{
-				powder_mouse_down(mouse.x, mouse.y);
-			}
+			screen_update_mouse(&mouse);
 			powder_update(update_delta);
 			tick_elapsed.QuadPart -= POWDER_TICK_RATE * frequency.QuadPart;
 		}
