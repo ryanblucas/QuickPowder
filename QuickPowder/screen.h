@@ -30,3 +30,4 @@ typedef enum screen_color
 
 void screen_set_pixel(int x, int y, screen_color_t color);
 void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color);
+void screen_format(const char* fmt, ...);

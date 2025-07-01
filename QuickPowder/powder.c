@@ -31,7 +31,8 @@ void powder_update(double delta)
 	{
 		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
 		{
-			switch (powder_get(x, y))
+			powder_type_t curr = powder_get(x, y);
+			switch (curr)
 			{
 			case TYPE_SAND:
 				if (powder_get(x, y + 1) == TYPE_AIR)

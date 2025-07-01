@@ -28,7 +28,7 @@ typedef struct mouse
 static CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
 static HANDLE input, output;
 
-static void screen_format(const char* fmt, ...)
+void screen_format(const char* fmt, ...)
 {
 	static char* current_buffer = NULL;
 	static int size;
@@ -162,7 +162,7 @@ int main()
 
 	bool running = true;
 
-	LARGE_INTEGER frequency, curr, prev = { 0 };
+	LARGE_INTEGER frequency, curr, prev;
 	LARGE_INTEGER fps_elapsed = { 0 }, tick_elapsed = { 0 };
 	int fps_samples = 0;
 	RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceFrequency(&frequency));
@@ -171,6 +171,7 @@ int main()
 
 	mouse_t mouse = { 0 };
 
+	RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&prev));
 	do
 	{
 		RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&curr));
