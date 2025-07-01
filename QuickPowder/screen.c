@@ -18,9 +18,12 @@
 #define RUNTIME_ASSERT(func) ((func) || (screen_format(#func " failed at line " __STR2(__LINE__) ".\n"), exit(-1), false))
 #define RUNTIME_ASSERT_WIN32(func) ((func) || (screen_format(#func " failed at line " __STR2(__LINE__) " with error code %i.\n", GetLastError()), exit(-1), false))
 
+#define MOUSE_1 0x01
+#define MOUSE_2 0x02
+
 typedef struct mouse
 {
-	bool mouse1, mouse2;
+	int mask, pmask;
 	int x, y;
 	int px, py;
 } mouse_t;
@@ -138,10 +141,9 @@ static void screen_initialize_output_buffer(void)
 
 static void screen_handle_mouse(mouse_t* mouse, MOUSE_EVENT_RECORD mer)
 {
-	/* to do: incorporate dwButtonState check */
 	if (mer.dwEventFlags == 0)
 	{
-		mouse->mouse1 = !mouse->mouse1;
+		mouse->mask = !!(mer.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED) | (!!(mer.dwButtonState & RIGHTMOST_BUTTON_PRESSED) << 1);
 	}
 	mouse->x = mer.dwMousePosition.X;
 	mouse->y = mer.dwMousePosition.Y;
@@ -149,7 +151,7 @@ static void screen_handle_mouse(mouse_t* mouse, MOUSE_EVENT_RECORD mer)
 
 static void screen_update_mouse(mouse_t* mouse)
 {
-	if (mouse->mouse1)
+	if (mouse->mask & MOUSE_1)
 	{
 		/* credit: https://zingl.github.io/bresenham.html */
 		int dx = abs(mouse->x - mouse->px),
@@ -179,8 +181,13 @@ static void screen_update_mouse(mouse_t* mouse)
 			}
 		}
 	}
+	if (mouse->mask & MOUSE_2 && mouse->pmask ^ MOUSE_2)
+	{
+		powder_query_at(mouse->x, mouse->y);
+	}
 	mouse->px = mouse->x;
 	mouse->py = mouse->y;
+	mouse->pmask = mouse->mask;
 }
 
 int main()

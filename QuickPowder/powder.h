@@ -17,3 +17,4 @@ void powder_update(double delta);
 void powder_render(double delta);
 void powder_key_clicked(char key);
 void powder_mouse_down(int x, int y);
+void powder_query_at(int x, int y);

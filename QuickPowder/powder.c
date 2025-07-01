@@ -26,6 +26,21 @@ static inline void powder_set(int x, int y, powder_type_t type)
 	canvas[x + y * SCREEN_WIDTH] = type;
 }
 
+static int powder_tower(int x, int y)
+{
+	int sy = y;
+	powder_type_t query = powder_get(x, y);
+	if (query == TYPE_AIR)
+	{
+		return 0;
+	}
+	while (powder_get(x, y) == query)
+	{
+		y++;
+	}
+	return y - sy;
+}
+
 void powder_update(double delta)
 {
 	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
@@ -82,4 +97,9 @@ void powder_mouse_down(int x, int y)
 	{
 		powder_set(x, y, current);
 	}
+}
+
+void powder_query_at(int x, int y)
+{
+	screen_format("Tower size at (%i, %i): %i\n", x, y, powder_tower(x, y));
 }
