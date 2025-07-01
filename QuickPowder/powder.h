@@ -9,7 +9,8 @@
 typedef enum powder_type
 {
 	TYPE_AIR,
-	TYPE_SAND
+	TYPE_GROUND,
+	TYPE_SAND,
 } powder_type_t;
 
 void powder_update(double delta);

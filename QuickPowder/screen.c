@@ -18,6 +18,13 @@
 #define RUNTIME_ASSERT(func) ((func) || (screen_format(#func " failed at line " __STR2(__LINE__) ".\n"), exit(-1), false))
 #define RUNTIME_ASSERT_WIN32(func) ((func) || (screen_format(#func " failed at line " __STR2(__LINE__) " with error code %i.\n", GetLastError()), exit(-1), false))
 
+typedef struct mouse
+{
+	bool mouse1, mouse2;
+	int x, y;
+	int px, py;
+} mouse_t;
+
 static CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
 static HANDLE input, output;
 
@@ -162,6 +169,8 @@ int main()
 
 	RUNTIME_ASSERT_WIN32(TIMERR_NOERROR == timeBeginPeriod(1));
 
+	mouse_t mouse = { 0 };
+
 	do
 	{
 		RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&curr));
@@ -182,7 +191,7 @@ int main()
 				{
 					running = false;
 				}
-				else if (ker.uChar.AsciiChar >= '0' && ker.uChar.AsciiChar <= '9')
+				else if (ker.uChar.AsciiChar >= '0' && ker.uChar.AsciiChar <= '9' && ker.bKeyDown == TRUE)
 				{
 					powder_key_clicked(ker.uChar.AsciiChar);
 				}
@@ -191,10 +200,15 @@ int main()
 			case MOUSE_EVENT:
 			{
 				MOUSE_EVENT_RECORD mer = record.Event.MouseEvent;
-				if (mer.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
+				/* to do: incorporate dwButtonState check */
+				if (mer.dwEventFlags == 0)
 				{
-					powder_mouse_down(mer.dwMousePosition.X, mer.dwMousePosition.Y);
+					mouse.mouse1 = !mouse.mouse1;
 				}
+				mouse.px = mouse.x;
+				mouse.py = mouse.y;
+				mouse.x = mer.dwMousePosition.X;
+				mouse.y = mer.dwMousePosition.Y;
 			}
 			case WINDOW_BUFFER_SIZE_EVENT:
 			{
@@ -216,6 +230,10 @@ int main()
 		double update_delta = (double)tick_elapsed.QuadPart / frequency.QuadPart;
 		if (update_delta > POWDER_TICK_RATE)
 		{
+			if (mouse.mouse1)
+			{
+				powder_mouse_down(mouse.x, mouse.y);
+			}
 			powder_update(update_delta);
 			tick_elapsed.QuadPart -= POWDER_TICK_RATE * frequency.QuadPart;
 		}
