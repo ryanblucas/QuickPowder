@@ -10,9 +10,6 @@
 #include <strsafe.h>
 #include <Windows.h>
 
-#define SCREEN_PIXEL_SIZE	8
-#define SCREEN_WIDTH		(800 / SCREEN_PIXEL_SIZE)
-#define SCREEN_HEIGHT		(600 / SCREEN_PIXEL_SIZE)
 #define SCREEN_TITLE		L"QuickPowder"
 #define SCREEN_TARGET_DELTA	(1.0 / 144)
 
@@ -156,22 +153,10 @@ int main()
 		screen[i].Attributes = COLOR_BLACK << 4;
 	}
 
-	screen_set_rect(14, 14, 12, 4, COLOR_WHITE);
-	for (screen_color_t i = 0; i < 8; i++)
-	{
-		screen_set_pixel(16 + i, 16, i);
-	}
-
-	for (screen_color_t i = 8; i < 16; i++)
-	{
-		screen_set_pixel(20 + i, 16, i);
-	}
-	
-	screen_invalidate();
-
 	bool running = true;
 
-	LARGE_INTEGER frequency, curr, prev = { 0 }, fps_elapsed = {0};
+	LARGE_INTEGER frequency, curr, prev = { 0 };
+	LARGE_INTEGER fps_elapsed = { 0 }, tick_elapsed = { 0 };
 	int fps_samples = 0;
 	RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceFrequency(&frequency));
 
@@ -192,11 +177,24 @@ int main()
 			{
 			case KEY_EVENT:
 			{
-				if (record.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
+				KEY_EVENT_RECORD ker = record.Event.KeyEvent;
+				if (ker.wVirtualKeyCode == VK_ESCAPE)
 				{
 					running = false;
 				}
+				else if (ker.uChar.AsciiChar >= '0' && ker.uChar.AsciiChar <= '9')
+				{
+					powder_key_clicked(ker.uChar.AsciiChar);
+				}
 				break;
+			}
+			case MOUSE_EVENT:
+			{
+				MOUSE_EVENT_RECORD mer = record.Event.MouseEvent;
+				if (mer.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED)
+				{
+					powder_mouse_down(mer.dwMousePosition.X, mer.dwMousePosition.Y);
+				}
 			}
 			case WINDOW_BUFFER_SIZE_EVENT:
 			{
@@ -213,10 +211,20 @@ int main()
 		}
 
 		LONGLONG delta_long = curr.QuadPart - prev.QuadPart;
-		double delta = (double)(delta_long) / frequency.QuadPart;
-		powder_frame(delta);
+		tick_elapsed.QuadPart += delta_long;
+
+		double update_delta = (double)tick_elapsed.QuadPart / frequency.QuadPart;
+		if (update_delta > POWDER_TICK_RATE)
+		{
+			powder_update(update_delta);
+			tick_elapsed.QuadPart -= POWDER_TICK_RATE * frequency.QuadPart;
+		}
+
+		powder_render((double)(delta_long) / frequency.QuadPart);
+		screen_invalidate();
 
 		fps_elapsed.QuadPart += delta_long;
+
 		fps_samples++;
 		if (fps_elapsed.QuadPart >= frequency.QuadPart)
 		{
@@ -231,10 +239,11 @@ int main()
 		LARGE_INTEGER end;
 		RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&end));
 
+		/* not perfect, but this is fine for a project like this */
 		double rest = SCREEN_TARGET_DELTA - (double)(end.QuadPart - curr.QuadPart) / frequency.QuadPart;
 		if (rest > 0.0F)
 		{
-			Sleep(rest * 1000);
+			Sleep((DWORD)(rest * 1000));
 		}
 
 		prev = curr;

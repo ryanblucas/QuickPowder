@@ -4,6 +4,10 @@
 
 #pragma once
 
+#define SCREEN_PIXEL_SIZE	8
+#define SCREEN_WIDTH		(800 / SCREEN_PIXEL_SIZE)
+#define SCREEN_HEIGHT		(600 / SCREEN_PIXEL_SIZE)
+
 typedef enum screen_color
 {
 	COLOR_BLACK,

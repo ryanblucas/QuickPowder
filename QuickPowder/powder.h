@@ -4,4 +4,15 @@
 
 #pragma once
 
-void powder_frame(double delta);
+#define POWDER_TICK_RATE	(1 / 20.0)
+
+typedef enum powder_type
+{
+	TYPE_AIR,
+	TYPE_SAND
+} powder_type_t;
+
+void powder_update(double delta);
+void powder_render(double delta);
+void powder_key_clicked(char key);
+void powder_mouse_down(int x, int y);
