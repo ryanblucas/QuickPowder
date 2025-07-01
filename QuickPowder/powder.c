@@ -30,7 +30,7 @@ static inline void powder_set(int x, int y, powder_type_t type)
 static bool powder_is_grounded(int x, int y)
 {
 	powder_type_t query = powder_get(x, y);
-	if (query == TYPE_AIR)
+	if (TYPE_AIR == query)
 	{
 		return false;
 	}
@@ -44,17 +44,39 @@ void powder_update(double delta)
 	{
 		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
 		{
-			if (powder_is_grounded(x, y) && powder_get(x, y) == TYPE_SAND && powder_get(x, y - 1) == TYPE_SAND)
+			bool is_grounded = powder_is_grounded(x, y);
+			powder_type_t curr = powder_get(x, y), above = powder_get(x, y - 1);
+			if (is_grounded && TYPE_SAND == curr && TYPE_SAND == above)
 			{
-				if (powder_get(x - 1, y) == TYPE_AIR)
+				powder_type_t left = powder_get(x - 1, y),
+					right = powder_get(x + 1, y);
+				if (TYPE_AIR == left || TYPE_WATER == left)
 				{
 					powder_set(x, y - 1, TYPE_AIR);
 					powder_set(x - 1, y, TYPE_SAND);
 				}
-				else if (powder_get(x + 1, y) == TYPE_AIR)
+				else if (TYPE_AIR == right || TYPE_WATER == right)
 				{
 					powder_set(x, y - 1, TYPE_AIR);
 					powder_set(x + 1, y, TYPE_SAND);
+				}
+			}
+			else if (is_grounded && TYPE_WATER == curr && TYPE_WATER == above)
+			{
+				int lx, rx;
+				for (lx = x; powder_get(lx, y) == TYPE_WATER; lx--);
+				for (rx = x; powder_get(rx, y) == TYPE_WATER; rx++);
+				int lwx = x - lx,
+					rwx = rx - x;
+				if (lwx > rwx && powder_get(rx, y) == TYPE_AIR)
+				{
+					powder_set(rx, y, TYPE_WATER);
+					powder_set(x, y - 1, TYPE_AIR);
+				}
+				else if (lwx <= rwx && powder_get(lx, y) == TYPE_AIR)
+				{
+					powder_set(lx, y, TYPE_WATER);
+					powder_set(x, y - 1, TYPE_AIR);
 				}
 			}
 		}
@@ -64,14 +86,21 @@ void powder_update(double delta)
 	{
 		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
 		{
-			powder_type_t curr = powder_get(x, y);
+			powder_type_t curr = powder_get(x, y), down = powder_get(x, y + 1);
 			switch (curr)
 			{
 			case TYPE_SAND:
-				if (powder_get(x, y + 1) == TYPE_AIR)
+				if (TYPE_AIR == down || TYPE_WATER == down)
 				{
-					powder_set(x, y, TYPE_AIR);
+					powder_set(x, y, down);
 					powder_set(x, y + 1, TYPE_SAND);
+				}
+				break;
+			case TYPE_WATER:
+				if (TYPE_AIR == down || TYPE_WATER == down)
+				{
+					powder_set(x, y, down);
+					powder_set(x, y + 1, TYPE_WATER);
 				}
 				break;
 			}
@@ -104,7 +133,7 @@ void powder_render(double delta)
 
 void powder_key_clicked(char key)
 {
-	if (key >= '0' && key <= '2')
+	if (key >= '0' && key <= '3')
 	{
 		key -= '0';
 		current = key;
