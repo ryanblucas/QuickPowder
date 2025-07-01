@@ -5,12 +5,16 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <Windows.h>
-
-#define RETURN_IF_CONDITION(cond) do { if (cond) return __LINE__; } while (0)
+#include <strsafe.h>
 
 #define SCREEN_PIXEL_SIZE	8
 #define SCREEN_WIDTH		(800 / SCREEN_PIXEL_SIZE)
 #define SCREEN_HEIGHT		(600 / SCREEN_PIXEL_SIZE)
+
+#define __STR2(s) __STR(s)
+#define __STR(s) #s
+#define RUNTIME_ASSERT(func) ((func) || (debug_format(#func " failed at line " __STR2(__LINE__) ".\n"), exit(-1), false))
+#define RUNTIME_ASSERT_WIN32(func) ((func) || (debug_format(#func " failed at line " __STR2(__LINE__) " with error code %i.\n", GetLastError()), exit(-1), false))
 
 typedef enum screen_color
 {
@@ -35,6 +39,38 @@ typedef enum screen_color
 static CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
 static HANDLE input, output;
 
+void debug_format(const char* fmt, ...)
+{
+	static char* current_buffer = NULL;
+	static int size;
+
+	if (!current_buffer)
+	{
+		size = 256;
+		current_buffer = malloc(size * sizeof * current_buffer);
+		if (!current_buffer)
+		{
+			exit(1); /* The program most certainly couldn't run if it can't allocate 256 bytes */
+		}
+	}
+
+	va_list list;
+	va_start(list, fmt);
+	while (StringCbVPrintfA(current_buffer, size, fmt, list) == STRSAFE_E_INSUFFICIENT_BUFFER)
+	{
+		free(current_buffer);
+		size *= 2;
+		current_buffer = malloc(size * sizeof * current_buffer);
+		if (!current_buffer)
+		{
+			exit(1);
+		}
+	}
+	va_end(list);
+
+	OutputDebugStringA(current_buffer);
+}
+
 inline void screen_set_pixel(int x, int y, screen_color_t color)
 {
 	screen[x + y * SCREEN_WIDTH].Attributes = color << 4;
@@ -51,79 +87,83 @@ inline void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color)
 	}
 }
 
-inline void screen_invalidate(void)
+static void screen_invalidate(void)
 {
 	SMALL_RECT rect = { 0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1 };
-	if (FALSE == WriteConsoleOutputW(output, screen, (COORD) { SCREEN_WIDTH, SCREEN_HEIGHT }, (COORD) { 0, 0 }, &rect))
+	RUNTIME_ASSERT_WIN32(WriteConsoleOutputW(output, screen, (COORD) { SCREEN_WIDTH, SCREEN_HEIGHT }, (COORD) { 0, 0 }, &rect));
+}
+
+static void screen_initialize_cursor(void)
+{
+	CONSOLE_CURSOR_INFO cci;
+	RUNTIME_ASSERT_WIN32(TRUE == GetConsoleCursorInfo(output, &cci));
+	cci.bVisible = FALSE;
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleCursorInfo(output, &cci));
+}
+
+static void screen_initialize_font(void)
+{
+	CONSOLE_FONT_INFOEX cfi = { sizeof cfi };
+	RUNTIME_ASSERT_WIN32(TRUE == GetCurrentConsoleFontEx(output, FALSE, &cfi));
+	cfi.dwFontSize.X = SCREEN_PIXEL_SIZE - 1; /* TO DO: why does this make pixels the right size? */
+	cfi.dwFontSize.Y = SCREEN_PIXEL_SIZE;
+	cfi.FontFamily = FF_DONTCARE;
+	cfi.nFont = 0;
+	memset(cfi.FaceName, 0, sizeof cfi.FaceName);
+	RUNTIME_ASSERT_WIN32(TRUE == SetCurrentConsoleFontEx(output, FALSE, &cfi));
+}
+
+static void screen_initialize_output_buffer(void)
+{
+	CONSOLE_SCREEN_BUFFER_INFOEX csbi = { sizeof csbi };
+	RUNTIME_ASSERT_WIN32(TRUE == GetConsoleScreenBufferInfoEx(output, &csbi));
+
+	csbi.dwMaximumWindowSize.X = SCREEN_WIDTH;
+	csbi.dwMaximumWindowSize.Y = SCREEN_HEIGHT;
+	csbi.dwSize = csbi.dwMaximumWindowSize;
+
+	COLORREF table[16] =
 	{
-		exit(-1);
-	}
+		RGB(0, 0, 0),
+		RGB(0, 0, 128),
+		RGB(0, 128, 0),
+		RGB(0, 128, 128),
+		RGB(128, 0, 0),
+		RGB(128, 0, 128),
+		RGB(128, 128, 0),
+		RGB(192, 192, 192),
+		RGB(128, 128, 128),
+		RGB(0, 0, 255),
+		RGB(0, 255, 0),
+		RGB(0, 255, 255),
+		RGB(255, 0, 0),
+		RGB(255, 0, 255),
+		RGB(255, 255, 0),
+		RGB(255, 255, 255),
+	};
+
+	memcpy(csbi.ColorTable, table, sizeof table);
+
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleScreenBufferInfoEx(output, &csbi));
 }
 
 int main()
 {
 	output = CreateConsoleScreenBuffer(GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CONSOLE_TEXTMODE_BUFFER, NULL);
 	
-	RETURN_IF_CONDITION(INVALID_HANDLE_VALUE == output);
-	RETURN_IF_CONDITION(FALSE == SetConsoleActiveScreenBuffer(output));
-	RETURN_IF_CONDITION(FALSE == SetConsoleMode(output, 0));
+	RUNTIME_ASSERT_WIN32(INVALID_HANDLE_VALUE != output);
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleActiveScreenBuffer(output));
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleMode(output, 0));
 
 	input = GetStdHandle(STD_INPUT_HANDLE);
-	RETURN_IF_CONDITION(INVALID_HANDLE_VALUE == input || NULL == input);
-	RETURN_IF_CONDITION(FALSE == SetConsoleMode(input, ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT));
+	RUNTIME_ASSERT_WIN32(INVALID_HANDLE_VALUE != input && NULL != input);
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleMode(input, ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT));
 
-	{
-		CONSOLE_CURSOR_INFO cci;
-		RETURN_IF_CONDITION(FALSE == GetConsoleCursorInfo(output, &cci));
-		cci.bVisible = FALSE;
-		RETURN_IF_CONDITION(FALSE == SetConsoleCursorInfo(output, &cci));
-	}
+	screen_initialize_cursor();
+	screen_initialize_font();
+	screen_initialize_output_buffer();
 
-	{
-		CONSOLE_FONT_INFOEX cfi = { sizeof cfi };
-		RETURN_IF_CONDITION(FALSE == GetCurrentConsoleFontEx(output, FALSE, &cfi));
-		cfi.dwFontSize.X = SCREEN_PIXEL_SIZE - 1; /* TO DO: why does this make pixels the right size? */
-		cfi.dwFontSize.Y = SCREEN_PIXEL_SIZE;
-		cfi.FontFamily = FF_DONTCARE;
-		cfi.nFont = 0;
-		memset(cfi.FaceName, 0, sizeof cfi.FaceName);
-		RETURN_IF_CONDITION(FALSE == SetCurrentConsoleFontEx(output, FALSE, &cfi));
-	}
-
-	{
-		CONSOLE_SCREEN_BUFFER_INFOEX csbi = { sizeof csbi };
-		RETURN_IF_CONDITION(FALSE == GetConsoleScreenBufferInfoEx(output, &csbi));
-
-		csbi.dwMaximumWindowSize.X = SCREEN_WIDTH;
-		csbi.dwMaximumWindowSize.Y = SCREEN_HEIGHT;
-		csbi.dwSize = csbi.dwMaximumWindowSize;
-
-		COLORREF table[16] =
-		{
-			RGB(0, 0, 0),
-			RGB(0, 0, 128),
-			RGB(0, 128, 0),
-			RGB(0, 128, 128),
-			RGB(128, 0, 0),
-			RGB(128, 0, 128),
-			RGB(128, 128, 0),
-			RGB(192, 192, 192),
-			RGB(128, 128, 128),
-			RGB(0, 0, 255),
-			RGB(0, 255, 0),
-			RGB(0, 255, 255),
-			RGB(255, 0, 0),
-			RGB(255, 0, 255),
-			RGB(255, 255, 0),
-			RGB(255, 255, 255),
-		};
-
-		memcpy(csbi.ColorTable, table, sizeof table);
-
-		RETURN_IF_CONDITION(FALSE == SetConsoleScreenBufferInfoEx(output, &csbi));
-	}
-
-	RETURN_IF_CONDITION(FALSE == SetConsoleTitleW(L"QuickPowder"));
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(L"QuickPowder"));
 
 	for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
 	{
@@ -149,12 +189,30 @@ int main()
 	DWORD records_read_len;
 	do
 	{
-		RETURN_IF_CONDITION(FALSE == ReadConsoleInputW(input, &record, 1, &records_read_len));
+		RUNTIME_ASSERT_WIN32(TRUE == ReadConsoleInputW(input, &record, 1, &records_read_len));
 		assert(1 == records_read_len);
 
-		if (record.EventType == KEY_EVENT && record.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
+		switch (record.EventType)
 		{
-			running = false;
+		case KEY_EVENT:
+		{
+			if (record.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
+			{
+				running = false;
+			}
+			break;
+		}
+		case WINDOW_BUFFER_SIZE_EVENT:
+		{
+			RECT fitted = (RECT){ .right = SCREEN_WIDTH * SCREEN_PIXEL_SIZE, .bottom = SCREEN_HEIGHT * SCREEN_PIXEL_SIZE };
+			assert(AdjustWindowRectEx(&fitted, GetWindowLong(GetConsoleWindow(), GWL_STYLE), FALSE, GetWindowLong(GetConsoleWindow(), GWL_EXSTYLE)));
+			RUNTIME_ASSERT_WIN32(TRUE == SetWindowPos(GetConsoleWindow(), NULL, 0, 0, fitted.right - fitted.left, fitted.bottom - fitted.top, SWP_NOMOVE));
+
+			screen_invalidate();
+			screen_initialize_cursor();
+
+			break;
+		}
 		}
 
 	} while (running);
