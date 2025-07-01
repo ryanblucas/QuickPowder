@@ -151,6 +151,7 @@ static void screen_update_mouse(mouse_t* mouse)
 {
 	if (mouse->mouse1)
 	{
+		/* credit: https://zingl.github.io/bresenham.html */
 		int dx = abs(mouse->x - mouse->px),
 			sx = mouse->px < mouse->x ? 1 : -1;
 		int dy = -abs(mouse->y - mouse->py),
@@ -161,22 +162,18 @@ static void screen_update_mouse(mouse_t* mouse)
 		while (true)
 		{
 			powder_mouse_down(x, y);
+			if (x == mouse->x && y == mouse->y)
+			{
+				break;
+			}
 			int error2 = error * 2;
 			if (error2 >= dy)
 			{
-				if (x == mouse->x)
-				{
-					break;
-				}
 				error += dy;
 				x += sx;
 			}
 			if (error2 <= dx)
 			{
-				if (y == mouse->y)
-				{
-					break;
-				}
 				error += dx;
 				y += sy;
 			}
