@@ -1,45 +1,30 @@
 /*
-	main.c ~ RL
+	screen.c ~ RL
 */
 
+#include "screen.h"
+
 #include <assert.h>
+#include "powder.h"
 #include <stdbool.h>
-#include <Windows.h>
 #include <strsafe.h>
+#include <Windows.h>
 
 #define SCREEN_PIXEL_SIZE	8
 #define SCREEN_WIDTH		(800 / SCREEN_PIXEL_SIZE)
 #define SCREEN_HEIGHT		(600 / SCREEN_PIXEL_SIZE)
+#define SCREEN_TITLE		L"QuickPowder"
+#define SCREEN_TARGET_DELTA	(1.0 / 144)
 
 #define __STR2(s) __STR(s)
 #define __STR(s) #s
-#define RUNTIME_ASSERT(func) ((func) || (debug_format(#func " failed at line " __STR2(__LINE__) ".\n"), exit(-1), false))
-#define RUNTIME_ASSERT_WIN32(func) ((func) || (debug_format(#func " failed at line " __STR2(__LINE__) " with error code %i.\n", GetLastError()), exit(-1), false))
-
-typedef enum screen_color
-{
-	COLOR_BLACK,
-	COLOR_DARK_BLUE,
-	COLOR_DARK_GREEN,
-	COLOR_DARK_CYAN,
-	COLOR_DARK_RED,
-	COLOR_DARK_PURPLE,
-	COLOR_DARK_YELLOW,
-	COLOR_LIGHT_GRAY,
-	COLOR_DARK_GRAY,
-	COLOR_LIGHT_BLUE,
-	COLOR_LIGHT_GREEN,
-	COLOR_LIGHT_CYAN,
-	COLOR_LIGHT_RED,
-	COLOR_LIGHT_PURPLE,
-	COLOR_LIGHT_YELLOW,
-	COLOR_WHITE
-} screen_color_t;
+#define RUNTIME_ASSERT(func) ((func) || (screen_format(#func " failed at line " __STR2(__LINE__) ".\n"), exit(-1), false))
+#define RUNTIME_ASSERT_WIN32(func) ((func) || (screen_format(#func " failed at line " __STR2(__LINE__) " with error code %i.\n", GetLastError()), exit(-1), false))
 
 static CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
 static HANDLE input, output;
 
-void debug_format(const char* fmt, ...)
+static void screen_format(const char* fmt, ...)
 {
 	static char* current_buffer = NULL;
 	static int size;
@@ -71,12 +56,12 @@ void debug_format(const char* fmt, ...)
 	OutputDebugStringA(current_buffer);
 }
 
-inline void screen_set_pixel(int x, int y, screen_color_t color)
+void screen_set_pixel(int x, int y, screen_color_t color)
 {
 	screen[x + y * SCREEN_WIDTH].Attributes = color << 4;
 }
 
-inline void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color)
+void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color)
 {
 	for (int ox = 0; ox < wx; ox++)
 	{
@@ -163,7 +148,7 @@ int main()
 	screen_initialize_font();
 	screen_initialize_output_buffer();
 
-	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(L"QuickPowder"));
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(SCREEN_TITLE));
 
 	for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
 	{
@@ -185,40 +170,80 @@ int main()
 	screen_invalidate();
 
 	bool running = true;
-	INPUT_RECORD record;
-	DWORD records_read_len;
+
+	LARGE_INTEGER frequency, curr, prev = { 0 }, fps_elapsed = {0};
+	int fps_samples = 0;
+	RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceFrequency(&frequency));
+
+	RUNTIME_ASSERT_WIN32(TIMERR_NOERROR == timeBeginPeriod(1));
+
 	do
 	{
-		RUNTIME_ASSERT_WIN32(TRUE == ReadConsoleInputW(input, &record, 1, &records_read_len));
-		assert(1 == records_read_len);
+		RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&curr));
 
-		switch (record.EventType)
+		INPUT_RECORD record;
+		DWORD records_read_len;
+		RUNTIME_ASSERT_WIN32(TRUE == PeekConsoleInputW(input, &record, 1, &records_read_len));
+		if (1 == records_read_len)
 		{
-		case KEY_EVENT:
-		{
-			if (record.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
+			/* removes from buffer */
+			RUNTIME_ASSERT_WIN32(TRUE == ReadConsoleInputW(input, &record, 1, &records_read_len));
+			switch (record.EventType)
 			{
-				running = false;
+			case KEY_EVENT:
+			{
+				if (record.Event.KeyEvent.wVirtualKeyCode == VK_ESCAPE)
+				{
+					running = false;
+				}
+				break;
 			}
-			break;
+			case WINDOW_BUFFER_SIZE_EVENT:
+			{
+				RECT fitted = (RECT){ .right = SCREEN_WIDTH * SCREEN_PIXEL_SIZE, .bottom = SCREEN_HEIGHT * SCREEN_PIXEL_SIZE };
+				assert(AdjustWindowRectEx(&fitted, GetWindowLong(GetConsoleWindow(), GWL_STYLE), FALSE, GetWindowLong(GetConsoleWindow(), GWL_EXSTYLE)));
+				RUNTIME_ASSERT_WIN32(TRUE == SetWindowPos(GetConsoleWindow(), NULL, 0, 0, fitted.right - fitted.left, fitted.bottom - fitted.top, SWP_NOMOVE));
+
+				screen_invalidate();
+				screen_initialize_cursor();
+
+				break;
+			}
 		}
-		case WINDOW_BUFFER_SIZE_EVENT:
+		}
+
+		LONGLONG delta_long = curr.QuadPart - prev.QuadPart;
+		double delta = (double)(delta_long) / frequency.QuadPart;
+		powder_frame(delta);
+
+		fps_elapsed.QuadPart += delta_long;
+		fps_samples++;
+		if (fps_elapsed.QuadPart >= frequency.QuadPart)
 		{
-			RECT fitted = (RECT){ .right = SCREEN_WIDTH * SCREEN_PIXEL_SIZE, .bottom = SCREEN_HEIGHT * SCREEN_PIXEL_SIZE };
-			assert(AdjustWindowRectEx(&fitted, GetWindowLong(GetConsoleWindow(), GWL_STYLE), FALSE, GetWindowLong(GetConsoleWindow(), GWL_EXSTYLE)));
-			RUNTIME_ASSERT_WIN32(TRUE == SetWindowPos(GetConsoleWindow(), NULL, 0, 0, fitted.right - fitted.left, fitted.bottom - fitted.top, SWP_NOMOVE));
-
-			screen_invalidate();
-			screen_initialize_cursor();
-
-			break;
+			double fps = 1.0 / ((double)(fps_elapsed.QuadPart / fps_samples) / frequency.QuadPart);
+			wchar_t title_buf[128];
+			swprintf_s(title_buf, sizeof title_buf / sizeof * title_buf, SCREEN_TITLE L", FPS %f", fps);
+			RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(title_buf));
+			fps_elapsed.QuadPart = 0;
+			fps_samples = 0;
 		}
+
+		LARGE_INTEGER end;
+		RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&end));
+
+		double rest = SCREEN_TARGET_DELTA - (double)(end.QuadPart - curr.QuadPart) / frequency.QuadPart;
+		if (rest > 0.0F)
+		{
+			Sleep(rest * 1000);
 		}
+
+		prev = curr;
 
 	} while (running);
 
 	/* don't close STD input handle */
 	CloseHandle(output);
+	RUNTIME_ASSERT_WIN32(TIMERR_NOERROR == timeEndPeriod(1));
 
 	return 0;
 }
