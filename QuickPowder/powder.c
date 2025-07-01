@@ -5,13 +5,15 @@
 #include "powder.h"
 #include "screen.h"
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
 static powder_type_t current = TYPE_SAND;
 
-void powder_init(void)
+void powder_init(unsigned int seed)
 {
+	srand(seed);
 	for (int i = 0; i < sizeof canvas / sizeof * canvas; i++)
 	{
 		canvas[i] = TYPE_AIR;
@@ -47,7 +49,7 @@ static bool powder_is_grounded(int x, int y, powder_type_t mask)
 	return powder_get(x, y) & mask;
 }
 
-void powder_update(double delta)
+static void powder_update_spread(void)
 {
 	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
 	{
@@ -89,7 +91,10 @@ void powder_update(double delta)
 			}
 		}
 	}
+}
 
+static void powder_update_gravity(void)
+{
 	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
 	{
 		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
@@ -108,6 +113,60 @@ void powder_update(double delta)
 			}
 		}
 	}
+}
+
+#define POWDER_LIQUID_UPDATE_FREQUENCY 0.25
+
+static void powder_update_liquid(double delta)
+{
+	static double elapsed = 0.0;
+	elapsed += delta;
+	if (elapsed <= POWDER_LIQUID_UPDATE_FREQUENCY)
+	{
+		return;
+	}
+	elapsed -= POWDER_LIQUID_UPDATE_FREQUENCY;
+
+	/*	Two passes are so that particles arent moved more than once in one update.
+		This does provide a downside though, not every particle is guaranteed to be moved. */
+
+	/* left pass */
+	for (int x = 0; x < SCREEN_WIDTH; x++)
+	{
+		for (int y = 0; y < SCREEN_HEIGHT; y++)
+		{
+			if (POWDER_IS_LIQUID(powder_get(x, y)) && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && rand() % 2)
+			{
+				if (powder_get(x - 1, y) == TYPE_AIR)
+				{
+					powder_set(x, y, TYPE_AIR);
+					powder_set(x - 1, y, TYPE_WATER);
+				}
+			}
+		}
+	}
+	/* right pass */
+	for (int x = SCREEN_WIDTH; x >= 0; x--)
+	{
+		for (int y = 0; y < SCREEN_HEIGHT; y++)
+		{
+			if (POWDER_IS_LIQUID(powder_get(x, y)) && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && rand() % 2)
+			{
+				if (powder_get(x + 1, y) == TYPE_AIR)
+				{
+					powder_set(x, y, TYPE_AIR);
+					powder_set(x + 1, y, TYPE_WATER);
+				}
+			}
+		}
+	}
+}
+
+void powder_update(double delta)
+{
+	powder_update_spread();
+	powder_update_gravity();
+	powder_update_liquid(delta);
 }
 
 void powder_render(double delta)

@@ -18,7 +18,7 @@ typedef enum powder_type
 #define POWDER_IS_GROUND(type)	((type) & TYPE_GROUND)
 #define POWDER_IS_SOLID(type)	((type) & (TYPE_GROUND | TYPE_SAND))
 
-void powder_init(void);
+void powder_init(unsigned int seed);
 void powder_update(double delta);
 void powder_render(double delta);
 void powder_key_clicked(char key);

@@ -205,7 +205,6 @@ int main()
 	screen_initialize_cursor();
 	screen_initialize_font();
 	screen_initialize_output_buffer();
-	powder_init();
 
 	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(SCREEN_TITLE));
 
@@ -227,6 +226,7 @@ int main()
 	mouse_t mouse = { 0 };
 
 	RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&prev));
+	powder_init((unsigned int)prev.QuadPart);
 	do
 	{
 		RUNTIME_ASSERT_WIN32(TRUE == QueryPerformanceCounter(&curr));
