@@ -6,6 +6,7 @@
 #include "screen.h"
 
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
+static powder_type_t current = TYPE_SAND;
 
 static inline powder_type_t powder_get(int x, int y)
 {
@@ -58,6 +59,9 @@ void powder_render(double delta)
 			case TYPE_SAND:
 				screen_set_pixel(x, y, COLOR_LIGHT_YELLOW);
 				break;
+			case TYPE_GROUND:
+				screen_set_pixel(x, y, COLOR_DARK_GRAY);
+				break;
 			}
 		}
 	}
@@ -65,10 +69,17 @@ void powder_render(double delta)
 
 void powder_key_clicked(char key)
 {
-
+	if (key >= '0' && key <= '2')
+	{
+		key -= '0';
+		current = key;
+	}
 }
 
 void powder_mouse_down(int x, int y)
 {
-	powder_set(x, y, TYPE_SAND);
+	if (powder_get(x, y) == TYPE_AIR)
+	{
+		powder_set(x, y, current);
+	}
 }
