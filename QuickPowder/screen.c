@@ -205,6 +205,7 @@ int main()
 	screen_initialize_cursor();
 	screen_initialize_font();
 	screen_initialize_output_buffer();
+	powder_init();
 
 	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(SCREEN_TITLE));
 

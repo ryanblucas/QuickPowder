@@ -5,9 +5,18 @@
 #include "powder.h"
 #include "screen.h"
 #include <stdbool.h>
+#include <string.h>
 
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
 static powder_type_t current = TYPE_SAND;
+
+void powder_init(void)
+{
+	for (int i = 0; i < sizeof canvas / sizeof * canvas; i++)
+	{
+		canvas[i] = TYPE_AIR;
+	}
+}
 
 static inline powder_type_t powder_get(int x, int y)
 {
@@ -50,12 +59,12 @@ void powder_update(double delta)
 			{
 				powder_type_t left = powder_get(x - 1, y),
 					right = powder_get(x + 1, y);
-				if (TYPE_AIR == left || TYPE_WATER == left)
+				if (!POWDER_IS_SOLID(left))
 				{
 					powder_set(x, y - 1, TYPE_AIR);
 					powder_set(x - 1, y, TYPE_SAND);
 				}
-				else if (TYPE_AIR == right || TYPE_WATER == right)
+				else if (!POWDER_IS_SOLID(right))
 				{
 					powder_set(x, y - 1, TYPE_AIR);
 					powder_set(x + 1, y, TYPE_SAND);
@@ -90,17 +99,11 @@ void powder_update(double delta)
 			switch (curr)
 			{
 			case TYPE_SAND:
-				if (TYPE_AIR == down || TYPE_WATER == down)
-				{
-					powder_set(x, y, down);
-					powder_set(x, y + 1, TYPE_SAND);
-				}
-				break;
 			case TYPE_WATER:
-				if (TYPE_AIR == down || TYPE_WATER == down)
+				if (!POWDER_IS_SOLID(down))
 				{
 					powder_set(x, y, down);
-					powder_set(x, y + 1, TYPE_WATER);
+					powder_set(x, y + 1, curr);
 				}
 				break;
 			}
@@ -136,7 +139,7 @@ void powder_key_clicked(char key)
 	if (key >= '0' && key <= '3')
 	{
 		key -= '0';
-		current = key;
+		current = 1 << key;
 	}
 }
 
