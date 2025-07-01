@@ -279,7 +279,7 @@ int main()
 		{
 			screen_update_mouse(&mouse);
 			powder_update(update_delta);
-			tick_elapsed.QuadPart -= POWDER_TICK_RATE * frequency.QuadPart;
+			tick_elapsed.QuadPart -= (LONGLONG)(POWDER_TICK_RATE * frequency.QuadPart);
 		}
 
 		powder_render((double)(delta_long) / frequency.QuadPart);

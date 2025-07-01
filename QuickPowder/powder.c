@@ -4,6 +4,7 @@
 
 #include "powder.h"
 #include "screen.h"
+#include <stdbool.h>
 
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
 static powder_type_t current = TYPE_SAND;
@@ -26,23 +27,39 @@ static inline void powder_set(int x, int y, powder_type_t type)
 	canvas[x + y * SCREEN_WIDTH] = type;
 }
 
-static int powder_tower(int x, int y)
+static bool powder_is_grounded(int x, int y)
 {
-	int sy = y;
 	powder_type_t query = powder_get(x, y);
 	if (query == TYPE_AIR)
 	{
-		return 0;
+		return false;
 	}
-	while (powder_get(x, y) == query)
-	{
-		y++;
-	}
-	return y - sy;
+	for (; powder_get(x, y) == query; y++);
+	return powder_get(x, y) == TYPE_GROUND;
 }
 
 void powder_update(double delta)
 {
+	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
+	{
+		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
+		{
+			if (powder_is_grounded(x, y) && powder_get(x, y) == TYPE_SAND && powder_get(x, y - 1) == TYPE_SAND)
+			{
+				if (powder_get(x - 1, y) == TYPE_AIR)
+				{
+					powder_set(x, y - 1, TYPE_AIR);
+					powder_set(x - 1, y, TYPE_SAND);
+				}
+				else if (powder_get(x + 1, y) == TYPE_AIR)
+				{
+					powder_set(x, y - 1, TYPE_AIR);
+					powder_set(x + 1, y, TYPE_SAND);
+				}
+			}
+		}
+	}
+
 	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
 	{
 		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
@@ -101,5 +118,5 @@ void powder_mouse_down(int x, int y)
 
 void powder_query_at(int x, int y)
 {
-	screen_format("Tower size at (%i, %i): %i\n", x, y, powder_tower(x, y));
+
 }
