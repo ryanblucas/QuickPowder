@@ -36,7 +36,7 @@ static inline void powder_set(int x, int y, powder_type_t type)
 	canvas[x + y * SCREEN_WIDTH] = type;
 }
 
-static bool powder_is_grounded(int x, int y)
+static bool powder_is_grounded(int x, int y, powder_type_t mask)
 {
 	powder_type_t query = powder_get(x, y);
 	if (TYPE_AIR == query)
@@ -44,7 +44,7 @@ static bool powder_is_grounded(int x, int y)
 		return false;
 	}
 	for (; powder_get(x, y) == query; y++);
-	return powder_get(x, y) == TYPE_GROUND;
+	return powder_get(x, y) & mask;
 }
 
 void powder_update(double delta)
@@ -53,9 +53,8 @@ void powder_update(double delta)
 	{
 		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
 		{
-			bool is_grounded = powder_is_grounded(x, y);
 			powder_type_t curr = powder_get(x, y), above = powder_get(x, y - 1);
-			if (is_grounded && TYPE_SAND == curr && TYPE_SAND == above)
+			if (powder_is_grounded(x, y, TYPE_GROUND) && TYPE_SAND == curr && TYPE_SAND == above)
 			{
 				powder_type_t left = powder_get(x - 1, y),
 					right = powder_get(x + 1, y);
@@ -70,7 +69,7 @@ void powder_update(double delta)
 					powder_set(x + 1, y, TYPE_SAND);
 				}
 			}
-			else if (is_grounded && TYPE_WATER == curr && TYPE_WATER == above)
+			else if (powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && TYPE_WATER == curr && TYPE_WATER == above)
 			{
 				int lx, rx;
 				for (lx = x; powder_get(lx, y) == TYPE_WATER; lx--);
