@@ -94,6 +94,9 @@ void powder_render(double delta)
 			case TYPE_GROUND:
 				screen_set_pixel(x, y, COLOR_DARK_GRAY);
 				break;
+			case TYPE_WATER:
+				screen_set_pixel(x, y, COLOR_LIGHT_BLUE);
+				break;
 			}
 		}
 	}
@@ -108,7 +111,7 @@ void powder_key_clicked(char key)
 	}
 }
 
-void powder_mouse_down(int x, int y)
+void powder_mouse_primary_down(int x, int y)
 {
 	if (powder_get(x, y) == TYPE_AIR)
 	{
@@ -116,7 +119,7 @@ void powder_mouse_down(int x, int y)
 	}
 }
 
-void powder_query_at(int x, int y)
+void powder_mouse_aux_down(int x, int y)
 {
-
+	powder_set(x, y, TYPE_AIR);
 }

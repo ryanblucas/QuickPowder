@@ -163,7 +163,7 @@ static void screen_update_mouse(mouse_t* mouse)
 		int x = mouse->px, y = mouse->py;
 		while (true)
 		{
-			powder_mouse_down(x, y);
+			powder_mouse_primary_down(x, y);
 			if (x == mouse->x && y == mouse->y)
 			{
 				break;
@@ -183,7 +183,7 @@ static void screen_update_mouse(mouse_t* mouse)
 	}
 	if (mouse->mask & MOUSE_2 && mouse->pmask ^ MOUSE_2)
 	{
-		powder_query_at(mouse->x, mouse->y);
+		powder_mouse_aux_down(mouse->x, mouse->y);
 	}
 	mouse->px = mouse->x;
 	mouse->py = mouse->y;
