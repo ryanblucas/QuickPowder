@@ -24,6 +24,7 @@
 typedef struct mouse
 {
 	int mask, pmask;
+	int scroll_delta;
 	int x, y;
 	int px, py;
 } mouse_t;
@@ -141,9 +142,14 @@ static void screen_initialize_output_buffer(void)
 
 static void screen_handle_mouse(mouse_t* mouse, MOUSE_EVENT_RECORD mer)
 {
+	mouse->scroll_delta = 0;
 	if (mer.dwEventFlags == 0)
 	{
 		mouse->mask = !!(mer.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED) | (!!(mer.dwButtonState & RIGHTMOST_BUTTON_PRESSED) << 1);
+	}
+	else if (mer.dwEventFlags & MOUSE_WHEELED)
+	{
+		mouse->scroll_delta = (short)HIWORD(mer.dwButtonState) < 0 ? -1 : 1;
 	}
 	mouse->x = mer.dwMousePosition.X;
 	mouse->y = mer.dwMousePosition.Y;
@@ -181,10 +187,13 @@ static void screen_update_mouse(mouse_t* mouse)
 			}
 		}
 	}
-	if (mouse->mask & MOUSE_2 && mouse->pmask ^ MOUSE_2)
+	if (mouse->mask & MOUSE_2)
 	{
 		powder_mouse_aux_down(mouse->x, mouse->y);
 	}
+	powder_brush_size += mouse->scroll_delta;
+	powder_brush_size = min(max(1, powder_brush_size), 6);
+
 	mouse->px = mouse->x;
 	mouse->py = mouse->y;
 	mouse->pmask = mouse->mask;

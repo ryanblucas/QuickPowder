@@ -11,6 +11,8 @@
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
 static powder_type_t current = TYPE_SAND;
 
+int powder_brush_size = 2;
+
 void powder_init(unsigned int seed)
 {
 	srand(seed);
@@ -41,7 +43,7 @@ static inline void powder_set(int x, int y, powder_type_t type)
 static bool powder_is_grounded(int x, int y, powder_type_t mask)
 {
 	powder_type_t query = powder_get(x, y);
-	if (TYPE_AIR == query)
+	if (POWDER_IS_AIR(query))
 	{
 		return false;
 	}
@@ -137,7 +139,7 @@ static void powder_update_liquid(double delta)
 		{
 			if (POWDER_IS_LIQUID(powder_get(x, y)) && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && rand() % 2)
 			{
-				if (powder_get(x - 1, y) == TYPE_AIR)
+				if (POWDER_IS_AIR(powder_get(x - 1, y)))
 				{
 					powder_set(x, y, TYPE_AIR);
 					powder_set(x - 1, y, TYPE_WATER);
@@ -152,7 +154,7 @@ static void powder_update_liquid(double delta)
 		{
 			if (POWDER_IS_LIQUID(powder_get(x, y)) && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && rand() % 2)
 			{
-				if (powder_get(x + 1, y) == TYPE_AIR)
+				if (POWDER_IS_AIR(powder_get(x + 1, y)))
 				{
 					powder_set(x, y, TYPE_AIR);
 					powder_set(x + 1, y, TYPE_WATER);
@@ -187,6 +189,9 @@ void powder_render(double delta)
 			case TYPE_WATER:
 				screen_set_pixel(x, y, COLOR_LIGHT_BLUE);
 				break;
+			case TYPE_DEBUG:
+				screen_set_pixel(x, y, COLOR_LIGHT_RED);
+				break;
 			}
 		}
 	}
@@ -201,15 +206,26 @@ void powder_key_clicked(char key)
 	}
 }
 
+static inline void powder_set_rectangle(int x, int y, int wx, int wy, powder_type_t type)
+{
+	for (int xo = 0; xo < wx; xo++)
+	{
+		for (int yo = 0; yo < wy; yo++)
+		{
+			powder_set(x + xo, y + yo, type);
+		}
+	}
+}
+
 void powder_mouse_primary_down(int x, int y)
 {
-	if (powder_get(x, y) == TYPE_AIR)
+	if (POWDER_IS_AIR(powder_get(x, y)))
 	{
-		powder_set(x, y, current);
+		powder_set_rectangle(x - powder_brush_size / 2, y - powder_brush_size / 2, powder_brush_size, powder_brush_size, current);
 	}
 }
 
 void powder_mouse_aux_down(int x, int y)
 {
-	powder_set(x, y, TYPE_AIR);
+	powder_set_rectangle(x - powder_brush_size / 2, y - powder_brush_size / 2, powder_brush_size, powder_brush_size, TYPE_AIR);
 }

@@ -12,11 +12,15 @@ typedef enum powder_type
 	TYPE_GROUND		= 0x02,
 	TYPE_SAND		= 0x04,
 	TYPE_WATER		= 0x08,
+	TYPE_DEBUG		= 0x10
 } powder_type_t;
 
 #define POWDER_IS_LIQUID(type)	((type) & TYPE_WATER)
 #define POWDER_IS_GROUND(type)	((type) & TYPE_GROUND)
 #define POWDER_IS_SOLID(type)	((type) & (TYPE_GROUND | TYPE_SAND))
+#define POWDER_IS_AIR(type)		((type) & (TYPE_AIR | TYPE_DEBUG))
+
+extern int powder_brush_size;
 
 void powder_init(unsigned int seed);
 void powder_update(double delta);
