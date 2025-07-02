@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define POWDER_INDEX(x, y) (canvas[(x) + (y) * SCREEN_WIDTH])
+
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
 static powder_type_t current = TYPE_SAND;
 
@@ -28,7 +30,7 @@ static inline powder_type_t powder_get(int x, int y)
 	{
 		return TYPE_GROUND;
 	}
-	return canvas[x + y * SCREEN_WIDTH];
+	return POWDER_INDEX(x, y);
 }
 
 static inline void powder_set(int x, int y, powder_type_t type)
@@ -37,17 +39,13 @@ static inline void powder_set(int x, int y, powder_type_t type)
 	{
 		return;
 	}
-	canvas[x + y * SCREEN_WIDTH] = type;
+	POWDER_INDEX(x, y) = type;
 }
 
-static bool powder_is_grounded(int x, int y, powder_type_t mask)
+static inline bool powder_is_grounded(int x, int y, powder_type_t mask)
 {
-	powder_type_t query = powder_get(x, y);
-	if (POWDER_IS_AIR(query))
-	{
-		return false;
-	}
-	for (; powder_get(x, y) == query; y++);
+	powder_type_t query = POWDER_INDEX(x, y);
+	for (; POWDER_INDEX(x, y) == query && y < SCREEN_HEIGHT; y++);
 	return powder_get(x, y) & mask;
 }
 
@@ -55,25 +53,25 @@ static void powder_update_spread(void)
 {
 	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
 	{
-		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
+		for (int y = SCREEN_HEIGHT - 1; y > 0; y--)
 		{
-			powder_type_t curr = powder_get(x, y), above = powder_get(x, y - 1);
-			if (powder_is_grounded(x, y, TYPE_GROUND) && TYPE_SAND == curr && TYPE_SAND == above)
+			powder_type_t curr = POWDER_INDEX(x, y), above = POWDER_INDEX(x, y - 1);
+			if (TYPE_SAND == curr && TYPE_SAND == above && powder_is_grounded(x, y, TYPE_GROUND))
 			{
 				powder_type_t left = powder_get(x - 1, y),
 					right = powder_get(x + 1, y);
 				if (!POWDER_IS_SOLID(left))
 				{
-					powder_set(x, y - 1, TYPE_AIR);
+					POWDER_INDEX(x, y - 1) = TYPE_AIR;
 					powder_set(x - 1, y, TYPE_SAND);
 				}
 				else if (!POWDER_IS_SOLID(right))
 				{
-					powder_set(x, y - 1, TYPE_AIR);
+					POWDER_INDEX(x, y - 1) = TYPE_AIR;
 					powder_set(x + 1, y, TYPE_SAND);
 				}
 			}
-			else if (powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && TYPE_WATER == curr && TYPE_WATER == above)
+			else if (TYPE_WATER == curr && TYPE_WATER == above && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND))
 			{
 				int lx, rx;
 				for (lx = x; powder_get(lx, y) == TYPE_WATER; lx--);
@@ -83,12 +81,12 @@ static void powder_update_spread(void)
 				if (lwx > rwx && powder_get(rx, y) == TYPE_AIR)
 				{
 					powder_set(rx, y, TYPE_WATER);
-					powder_set(x, y - 1, TYPE_AIR);
+					POWDER_INDEX(x, y - 1) = TYPE_AIR;
 				}
 				else if (lwx <= rwx && powder_get(lx, y) == TYPE_AIR)
 				{
 					powder_set(lx, y, TYPE_WATER);
-					powder_set(x, y - 1, TYPE_AIR);
+					POWDER_INDEX(x, y - 1) = TYPE_AIR;
 				}
 			}
 		}
@@ -99,19 +97,13 @@ static void powder_update_gravity(void)
 {
 	for (int x = SCREEN_WIDTH - 1; x >= 0; x--)
 	{
-		for (int y = SCREEN_HEIGHT - 1; y >= 0; y--)
+		for (int y = SCREEN_HEIGHT - 2; y >= 0; y--)
 		{
-			powder_type_t curr = powder_get(x, y), down = powder_get(x, y + 1);
-			switch (curr)
+			powder_type_t curr = POWDER_INDEX(x, y), down = POWDER_INDEX(x, y + 1);
+			if (curr & (TYPE_SAND | TYPE_WATER) && !POWDER_IS_SOLID(down))
 			{
-			case TYPE_SAND:
-			case TYPE_WATER:
-				if (!POWDER_IS_SOLID(down))
-				{
-					powder_set(x, y, down);
-					powder_set(x, y + 1, curr);
-				}
-				break;
+				POWDER_INDEX(x, y) = down;
+				POWDER_INDEX(x, y + 1) = curr;
 			}
 		}
 	}
@@ -137,12 +129,12 @@ static void powder_update_liquid(double delta)
 	{
 		for (int y = 0; y < SCREEN_HEIGHT; y++)
 		{
-			if (POWDER_IS_LIQUID(powder_get(x, y)) && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && rand() % 2)
+			if (POWDER_IS_LIQUID(POWDER_INDEX(x, y)) && powder_is_grounded(x, y, TYPE_GROUND | TYPE_SAND) && rand() % 2)
 			{
 				if (POWDER_IS_AIR(powder_get(x - 1, y)))
 				{
-					powder_set(x, y, TYPE_AIR);
-					powder_set(x - 1, y, TYPE_WATER);
+					POWDER_INDEX(x, y) = TYPE_AIR;
+					POWDER_INDEX(x - 1, y) = TYPE_WATER;
 				}
 			}
 		}
@@ -156,8 +148,8 @@ static void powder_update_liquid(double delta)
 			{
 				if (POWDER_IS_AIR(powder_get(x + 1, y)))
 				{
-					powder_set(x, y, TYPE_AIR);
-					powder_set(x + 1, y, TYPE_WATER);
+					POWDER_INDEX(x, y) = TYPE_AIR;
+					POWDER_INDEX(x + 1, y) = TYPE_WATER;
 				}
 			}
 		}
@@ -173,26 +165,24 @@ void powder_update(double delta)
 
 void powder_render(double delta)
 {
-	screen_set_rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BLACK);
-	for (int x = 0; x < SCREEN_WIDTH; x++)
+	screen_clear(COLOR_BLACK);
+	for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
 	{
-		for (int y = 0; y < SCREEN_HEIGHT; y++)
+		/* this switch statement is faster than an array lookup? */
+		switch (canvas[i])
 		{
-			switch (powder_get(x, y))
-			{
-			case TYPE_SAND:
-				screen_set_pixel(x, y, COLOR_LIGHT_YELLOW);
-				break;
-			case TYPE_GROUND:
-				screen_set_pixel(x, y, COLOR_DARK_GRAY);
-				break;
-			case TYPE_WATER:
-				screen_set_pixel(x, y, COLOR_LIGHT_BLUE);
-				break;
-			case TYPE_DEBUG:
-				screen_set_pixel(x, y, COLOR_LIGHT_RED);
-				break;
-			}
+		case TYPE_SAND:
+			screen[i].Attributes = COLOR_LIGHT_YELLOW << 4;
+			break;
+		case TYPE_GROUND:
+			screen[i].Attributes = COLOR_DARK_GRAY << 4;
+			break;
+		case TYPE_WATER:
+			screen[i].Attributes = COLOR_LIGHT_BLUE << 4;
+			break;
+		case TYPE_DEBUG:
+			screen[i].Attributes = COLOR_LIGHT_RED << 4;
+			break;
 		}
 	}
 }
@@ -208,11 +198,16 @@ void powder_key_clicked(char key)
 
 static inline void powder_set_rectangle(int x, int y, int wx, int wy, powder_type_t type)
 {
+	wx = min(x + wx, SCREEN_WIDTH) - x;
+	x = max(x, 0);
+	wy = min(y + wy, SCREEN_HEIGHT) - y;
+	y = max(y, 0);
+
 	for (int xo = 0; xo < wx; xo++)
 	{
 		for (int yo = 0; yo < wy; yo++)
 		{
-			powder_set(x + xo, y + yo, type);
+			POWDER_INDEX(x + xo, y + yo) = type;
 		}
 	}
 }

@@ -4,9 +4,14 @@
 
 #pragma once
 
-#define SCREEN_PIXEL_SIZE	8
+#include <immintrin.h>
+#include <Windows.h>
+
+#define SCREEN_PIXEL_SIZE	4
 #define SCREEN_WIDTH		(800 / SCREEN_PIXEL_SIZE)
 #define SCREEN_HEIGHT		(600 / SCREEN_PIXEL_SIZE)
+
+extern CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
 
 typedef enum screen_color
 {
@@ -28,6 +33,30 @@ typedef enum screen_color
 	COLOR_WHITE
 } screen_color_t;
 
-void screen_set_pixel(int x, int y, screen_color_t color);
-void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color);
+extern inline void screen_set_pixel(int x, int y, screen_color_t color)
+{
+	screen[x + y * SCREEN_WIDTH].Attributes = color << 4;
+}
+
+extern inline void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color)
+{
+	for (int ox = 0; ox < wx; ox++)
+	{
+		for (int oy = 0; oy < wy; oy++)
+		{
+			screen[x + ox + (y + oy) * SCREEN_WIDTH].Attributes = color << 4;
+		}
+	}
+}
+
+extern inline void screen_clear(screen_color_t color)
+{
+	CHAR_INFO desired = { .Char.AsciiChar = ' ', .Attributes = color << 4};
+	__m256i curr = _mm256_set1_epi32(*(int*)&desired); /* UB, but who cares */
+	for (int i = 0; i < (SCREEN_WIDTH * SCREEN_HEIGHT) / 8; i++)
+	{
+		_mm256_storeu_si256((__m256i*)(&screen[i * 8]), curr);
+	}
+}
+
 void screen_format(const char* fmt, ...);

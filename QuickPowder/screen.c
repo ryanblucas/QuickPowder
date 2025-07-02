@@ -29,7 +29,7 @@ typedef struct mouse
 	int px, py;
 } mouse_t;
 
-static CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
+CHAR_INFO screen[SCREEN_WIDTH * SCREEN_HEIGHT];
 static HANDLE input, output;
 
 void screen_format(const char* fmt, ...)
@@ -64,22 +64,6 @@ void screen_format(const char* fmt, ...)
 	OutputDebugStringA(current_buffer);
 }
 
-void screen_set_pixel(int x, int y, screen_color_t color)
-{
-	screen[x + y * SCREEN_WIDTH].Attributes = color << 4;
-}
-
-void screen_set_rect(int x, int y, int wx, int wy, screen_color_t color)
-{
-	for (int ox = 0; ox < wx; ox++)
-	{
-		for (int oy = 0; oy < wy; oy++)
-		{
-			screen_set_pixel(ox + x, oy + y, color);
-		}
-	}
-}
-
 static void screen_invalidate(void)
 {
 	SMALL_RECT rect = { 0, 0, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1 };
@@ -98,7 +82,7 @@ static void screen_initialize_font(void)
 {
 	CONSOLE_FONT_INFOEX cfi = { sizeof cfi };
 	RUNTIME_ASSERT_WIN32(TRUE == GetCurrentConsoleFontEx(output, FALSE, &cfi));
-	cfi.dwFontSize.X = SCREEN_PIXEL_SIZE - 1; /* TO DO: why does this make pixels the right size? */
+	cfi.dwFontSize.X = SCREEN_PIXEL_SIZE + 1; /* TO DO: why does this make pixels the right size? Also, it slows down significantly if its -1? */
 	cfi.dwFontSize.Y = SCREEN_PIXEL_SIZE;
 	cfi.FontFamily = FF_DONTCARE;
 	cfi.nFont = 0;
