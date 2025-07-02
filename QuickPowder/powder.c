@@ -11,7 +11,7 @@
 #define POWDER_INDEX(x, y) (canvas[(x) + (y) * SCREEN_WIDTH])
 
 static powder_type_t canvas[SCREEN_WIDTH * SCREEN_HEIGHT];
-static powder_type_t current = TYPE_SAND;
+static powder_type_t current;
 
 int powder_brush_size = 2;
 
@@ -22,6 +22,7 @@ void powder_init(unsigned int seed)
 	{
 		canvas[i] = TYPE_AIR;
 	}
+	powder_key_clicked('2'); /* sand */
 }
 
 static inline powder_type_t powder_get(int x, int y)
@@ -193,6 +194,18 @@ void powder_key_clicked(char key)
 	{
 		key -= '0';
 		current = 1 << key;
+		switch (current)
+		{
+		case TYPE_SAND:
+			screen_set_caption("Sand selected");
+			break;
+		case TYPE_GROUND:
+			screen_set_caption("Ground selected");
+			break;
+		case TYPE_WATER:
+			screen_set_caption("Water selected");
+			break;
+		}
 	}
 }
 

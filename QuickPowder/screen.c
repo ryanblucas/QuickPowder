@@ -10,7 +10,7 @@
 #include <strsafe.h>
 #include <Windows.h>
 
-#define SCREEN_TITLE		L"QuickPowder"
+#define SCREEN_TITLE		"QuickPowder"
 #define SCREEN_TARGET_DELTA	(1.0 / 144)
 
 #define __STR2(s) __STR(s)
@@ -124,6 +124,14 @@ static void screen_initialize_output_buffer(void)
 	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleScreenBufferInfoEx(output, &csbi));
 }
 
+void screen_set_caption(const char* str)
+{
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleA(SCREEN_TITLE));
+	char title_buf[128];
+	sprintf_s(title_buf, sizeof title_buf / sizeof * title_buf, SCREEN_TITLE ", %s", str);
+	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleA(title_buf));
+}
+
 static void screen_handle_mouse(mouse_t* mouse, MOUSE_EVENT_RECORD mer)
 {
 	mouse->scroll_delta = 0;
@@ -198,8 +206,6 @@ int main()
 	screen_initialize_cursor();
 	screen_initialize_font();
 	screen_initialize_output_buffer();
-
-	RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(SCREEN_TITLE));
 
 	for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++)
 	{
@@ -285,9 +291,7 @@ int main()
 		if (fps_elapsed.QuadPart >= frequency.QuadPart)
 		{
 			double fps = 1.0 / ((double)(fps_elapsed.QuadPart / fps_samples) / frequency.QuadPart);
-			wchar_t title_buf[128];
-			swprintf_s(title_buf, sizeof title_buf / sizeof * title_buf, SCREEN_TITLE L", FPS %f", fps);
-			RUNTIME_ASSERT_WIN32(TRUE == SetConsoleTitleW(title_buf));
+			screen_format("FPS %f", fps);
 			fps_elapsed.QuadPart = 0;
 			fps_samples = 0;
 		}

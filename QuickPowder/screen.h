@@ -60,3 +60,4 @@ extern inline void screen_clear(screen_color_t color)
 }
 
 void screen_format(const char* fmt, ...);
+void screen_set_caption(const char* str);
